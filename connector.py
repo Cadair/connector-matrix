@@ -1,5 +1,6 @@
 import re
 import logging
+from functools import partial
 
 import aiohttp
 import markdown
@@ -172,6 +173,16 @@ class ConnectorMatrix(Connector):
             "formatted_body": clean_html
             }
 
+    async def _get_message_content(self, text, image=None):
+        if image:
+            return {
+                "url": image,
+                "msgtype": "m.image",
+                "body": text,
+            }
+        else:
+            return await self._get_html_content(text)
+
     async def respond(self, message, roomname=None):
         # Send message.text back to the chat service
 
@@ -187,17 +198,28 @@ class ConnectorMatrix(Connector):
         else:
             room_id = room_id
 
+        image_url = None
+        if hasattr(message, "image") and message.image:
+            if not message.image.startswith("mxc://"):
+                if message.image.startswith("http"):
+                    image_url = await self.connection.upload_image_to_matrix(message.image)
+            else:
+                image_url = message.image
+
+        content = await self._get_message_content(message.text, image_url)
+
+        await self._send_message(room_id, content)
+
+    async def _send_message(self, room_id, content):
+        send = partial(self.connection.send_message_event,
+                       room_id,
+                       "m.room.message",
+                       content)
         try:
-            await self.connection.send_message_event(
-                room_id,
-                "m.room.message",
-                await self._get_html_content(message.text))
+            await send()
         except aiohttp.client_exceptions.ServerDisconnectedError:
             _LOGGER.debug("Server had disconnected, retrying send.")
-            await self.connection.send_message_event(
-                room_id,
-                "m.room.message",
-                await self._get_html_content(message.text))
+            await send()
 
     async def disconnect(self):
         self.session.close()

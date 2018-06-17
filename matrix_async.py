@@ -111,3 +111,12 @@ class AsyncHTTPAPI(MatrixHttpApi):
             if mem['sender'] == user_id:
                 return mem['content']['displayname']
 
+    async def upload_image_to_matrix(self, image_url):
+        """
+        Given a URL upload the image to the homeserver for the given user.
+        """
+        async with self.client_session.request("GET", image_url) as resp:
+            data = await resp.read()
+
+        json = await self.media_upload(data, resp.content_type)
+        return json['content_uri']
