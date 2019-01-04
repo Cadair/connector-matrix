@@ -87,7 +87,6 @@ class ConnectorMatrix(Connector):
                     "types": []
                 },
                 "timeline": {
-                    "limit": 10,
                     "types": ["m.room.message"]
                 },
                 "ephemeral": {
